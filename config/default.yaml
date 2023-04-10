@@ -1,0 +1,40 @@
+seed: 42
+model:
+  name: 'iMeshSegNet'
+  num_classes: 17
+  num_channels: 15
+  with_dropout: True
+  dropout_p: 0.5
+  patch_size: 1000
+train:
+  checkpoint_dir: './checkpoints'
+  model_name: 'latest_checkpoint.pth'
+  pretrain_file: 
+  benchmark: False
+  deterministic: False
+  accelerator: 'cuda'
+  devices: [0]
+  strategy: 'ddp'
+  epochs: 100
+  precision: 32
+  accumulate_grad_batches: 2
+  auto_lr_find: False
+  auto_scale_batch_size: False
+  fast_dev_run: False
+  optimizer: 'adam'
+  learning_rate: 1e-4
+  weight_decay: 1e-5
+  step_size: 1000
+  gamma: 0.1
+logger:
+  use: True
+  project: 'tooth seg'
+  log_every_n_steps: 1
+dataloader:
+  batch_size: 4
+  num_workers: 8
+  trn_list: './dataset/FileLists/trn_list.csv'
+  val_list: './dataset/FileLists/val_list.csv'
+infer:
+  devices: [0]
+  accelerator: 'gpu'

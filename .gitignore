@@ -1,0 +1,11 @@
+checkpoints/
+dataset/3D_scans_ds/
+dataset/3D_scans_per_patient_obj_files_b1/
+dataset/3D_scans_per_patient_obj_files_b2/
+inf_output/
+lightning_logs
+runs
+wandb
+__pycache__
+*.ckpt
+*.ipynb
