@@ -9,3 +9,6 @@ wandb
 __pycache__
 *.ckpt
 *.ipynb
+*.venus01
+pytorch.*
+*.swp

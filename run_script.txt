@@ -1,0 +1,20 @@
+#i /bin/bash
+#PBS -P iMeshSegNet
+#PBS -j oe
+#PBS -N pytorch
+#PBS -q volta_gpu
+#PBS -l select=1:ncpus=5:mem=50gb:ngpus=1
+#PBS -l walltime=72:00:00
+
+cd $PBS_O_WORKDIR;
+
+image="/app1/common/singularity-img/3.0.0/pytorch_1.9_cuda_11.3.0-ubuntu20.04-py38-ngc_21.04.simg"
+
+singularity exec -e $image bash << EOF > stdout.$PBS_JOBID 2> stderr.$PBS_JOBID
+
+PYTHONPATH=$PYTHONPATH:/home/svu/e0983169/.local/lib/python3.8/site-packages
+export PYTHONPATH
+
+python train_lit.py
+
+EOF

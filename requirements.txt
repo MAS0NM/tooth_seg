@@ -1,12 +1,16 @@
+cython
 joblib==1.1.0
-numpy==1.21.5
+numpy
 omegaconf==2.3.0
-pandas==1.4.2
+pandas
 pygco==0.0.16
 pytorch_lightning==1.7.7
 pyvista==0.38.5
 timm==0.6.12
-torch==1.13.0.dev20220930+cu117
+# torch==1.13.0.dev20220930+cu117
 tqdm==4.64.0
 vedo==2023.4.4
 vtk==9.2.6
+wandb==0.14.0
+pyyaml
+absl-py

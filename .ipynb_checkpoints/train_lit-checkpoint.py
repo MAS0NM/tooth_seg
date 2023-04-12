@@ -76,5 +76,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     train(args.config_file)
-
-

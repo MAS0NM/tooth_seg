@@ -2,7 +2,6 @@ from torch.utils.data import Dataset
 import pandas as pd
 import torch
 import vedo
-from vedo import *
 from utils import *
 
 def gen_metadata(mesh, patch_size):
