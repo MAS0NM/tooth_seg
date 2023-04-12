@@ -3,7 +3,6 @@ import numpy as np
 from collections import Counter
 import vedo
 import json
-import random
 import torch
 import glob
 import os

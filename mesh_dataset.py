@@ -2,7 +2,6 @@ from torch.utils.data import Dataset
 import pandas as pd
 import torch
 import vedo
-from vedo import *
 from utils import *
 
 def gen_metadata(mesh, patch_size):
@@ -89,7 +88,7 @@ class Mesh_Dataset(Dataset):
             idx = idx.tolist()
 
         i_mesh = self.data_list.iloc[idx][0]
-        mesh = load(i_mesh)
+        mesh = vedo.load(i_mesh)
         if mesh.ncells > 10000:
             mesh.delete_cells([0])
             
