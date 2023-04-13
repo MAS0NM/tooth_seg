@@ -1,8 +1,39 @@
 from torch.utils.data import Dataset
 import pandas as pd
 import torch
-import vedo
 from utils import *
+import vtk
+import numpy as np
+
+def vtk2np(pointdata):
+    length = pointdata.GetNumberOfTuples()
+    dim = pointdata.GetNumberOfComponents()
+    numpy_array = np.empty((length, dim))
+    for i in range(length):
+        numpy_array[i] = pointdata.GetTuple(i)
+    return numpy_array
+
+def compute_normals(mesh):
+    
+    normals = vtk.vtkPolyDataNormals()
+    normals.SetInputData(mesh)
+    normals.SetComputeCellNormals(True)
+    normals.Update()
+    
+    cell_normals = vtk2np(normals.GetOutput().GetCellData().GetNormals())
+
+    return cell_normals
+
+def get_cell_centers(mesh):
+    cell_centers = vtk.vtkCellCenters()
+    cell_centers.SetInputData(mesh)
+    cell_centers.Update()
+
+    cell_centers_polydata = cell_centers.GetOutput()
+    cell_centers_polydata =vtk2np(cell_centers_polydata.GetPoints().GetData())
+    return cell_centers_polydata
+    
+    
 
 def gen_metadata(mesh, patch_size):
     '''
@@ -10,16 +41,15 @@ def gen_metadata(mesh, patch_size):
         input mesh form should be vedo.mesh.object
         which includes attributes: mesh.celldata['labels']
     '''
-    N = mesh.ncells
-    points = vedo.vtk2numpy(mesh.polydata().GetPoints().GetData())
+    N = mesh.GetNumberOfCells()
+    points = vtk2np(mesh.GetPoints().GetData())
     # get cells' points indices
-    ids = vedo.vtk2numpy(mesh.polydata().GetPolys().GetData()).reshape((N, -1))[:,1:]
+    ids = vtk2np(mesh.GetPolys().GetData()).astype(dtype='int32').reshape((N, -1))[:,1:]
     # get the points in coordinates
     cells = points[ids].reshape(N, 9).astype(dtype='float32')
-    labels = mesh.celldata["labels"].astype('int32').reshape(-1, 1)
-    mesh.compute_normals()
-    normals = mesh.celldata["Normals"]
-    barycenters = mesh.cell_centers()
+    labels = vtk2np(mesh.GetCellData().GetArray("labels")).astype('int32').reshape(-1, 1)
+    normals = compute_normals(mesh)
+    barycenters = get_cell_centers(mesh)
     
     #normalized data
     maxs = points.max(axis=0)
@@ -88,9 +118,10 @@ class Mesh_Dataset(Dataset):
             idx = idx.tolist()
 
         i_mesh = self.data_list.iloc[idx][0]
-        mesh = vedo.load(i_mesh)
-        if mesh.ncells > 10000:
-            mesh.delete_cells([0])
+        reader = vtk.vtkPolyDataReader()
+        reader.SetFileName(i_mesh)
+        reader.Update()
+        mesh = reader.GetOutput()
             
         sample = gen_metadata(mesh, self.patch_size)
         return sample
