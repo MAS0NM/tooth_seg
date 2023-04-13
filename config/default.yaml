@@ -20,6 +20,8 @@ train:
   accumulate_grad_batches: 2
   auto_lr_find: False
   auto_scale_batch_size: False
+  auto_lr_find: False
+  auto_scale_batch_size: False
   fast_dev_run: False
   optimizer: 'adam'
   learning_rate: 1e-4

@@ -1,8 +1,6 @@
 import pyvista as pv
 import numpy as np
 from collections import Counter
-from vedo import load
-import json
 import torch
 import glob
 import os
@@ -122,29 +120,29 @@ def set_face_label(mesh, labels_by_point, mode='count'):
     return labels_by_face
 
 
-def make_labeled_mesh_data(mesh_path, label_path):
-    mesh = load(mesh_path)
-    with open(label_path, 'r') as f:
-        attr = json.load(f)
-    labels_by_point = attr['labelByPoints']
-    labels_by_face = attr['labelByFaces']
-    mesh.pointdata['labels'] = labels_by_point
-    mesh.celldata['labels'] = labels_by_face
-    return mesh
+# def make_labeled_mesh_data(mesh_path, label_path):
+#     mesh = meshio.read(mesh_path)
+#     with open(label_path, 'r') as f:
+#         attr = json.load(f)
+#     labels_by_point = attr['labelByPoints']
+#     labels_by_face = attr['labelByFaces']
+#     mesh.pointdata['labels'] = labels_by_point
+#     mesh.celldata['labels'] = labels_by_face
+#     return mesh
 
 
-def dataReader(dir_path='./dataset/FileLists/fileList_lower_ds.txt', visualize=False):
-    meshes = []
-    with open(dir_path, 'r') as f:
-        for line in f.readlines():
-            line = line.strip().split('\t')
-            mesh_path = line[0]
-            label_path = line[1]
-            mesh = make_labeled_mesh_data(mesh_path, label_path)
-            meshes.append(mesh)
-            if visualize:
-                visualize_mesh(mesh)
-    return meshes
+# def dataReader(dir_path='./dataset/FileLists/fileList_lower_ds.txt', visualize=False):
+#     meshes = []
+#     with open(dir_path, 'r') as f:
+#         for line in f.readlines():
+#             line = line.strip().split('\t')
+#             mesh_path = line[0]
+#             label_path = line[1]
+#             mesh = make_labeled_mesh_data(mesh_path, label_path)
+#             meshes.append(mesh)
+#             if visualize:
+#                 visualize_mesh(mesh)
+#     return meshes
 
 def read_dir(dir_path='./dataset/3D_scans_ds/', extension='vtk', constrain='FLP'):
     files = []
