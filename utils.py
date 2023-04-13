@@ -1,9 +1,8 @@
 import pyvista as pv
 import numpy as np
 from collections import Counter
-import vedo
+from vedo import load
 import json
-import random
 import torch
 import glob
 import os
@@ -124,7 +123,7 @@ def set_face_label(mesh, labels_by_point, mode='count'):
 
 
 def make_labeled_mesh_data(mesh_path, label_path):
-    mesh = vedo.load(mesh_path)
+    mesh = load(mesh_path)
     with open(label_path, 'r') as f:
         attr = json.load(f)
     labels_by_point = attr['labelByPoints']
@@ -157,7 +156,7 @@ def read_dir(dir_path='./dataset/3D_scans_ds/', extension='vtk', constrain='FLP'
             files.append(file)
     return files
             
-def centring(mesh: vedo.Mesh):
+def centring(mesh):
     mesh.points(pts=mesh.points()-mesh.center_of_mass())
     return mesh
                         

@@ -20,17 +20,18 @@ def train(cfg_path: str):
     cfg = OmegaConf.load(cfg_path)
 
     pl.seed_everything(cfg.seed)
-
+    print('loading datamodule')
     datamodule = LitDataModule(cfg)
-
+    print('setting up datamodule')
     datamodule.setup()
-
+    print('initializing training module')
     module = LitModule(cfg)
-
+    print('trying to load last checkpoint')
     if cfg.train.pretrain_file is not None and os.path.exists(cfg.train.pretrain_file):
         module.load_model(cfg.train.pretrain_file)
     
     latest_model_to_load = f"{module.model.__class__.__name__}_{cfg.model.num_classes}_Classes_{cfg.train.precision}_f_best_loss"
+    print(f'successfully loaded {latest_model_to_load}')
     if latest_model_to_load is not None and os.path.exists(latest_model_to_load):
         module.load_model(latest_model_to_load)
 
@@ -48,7 +49,7 @@ def train(cfg_path: str):
                                     verbose="True",
                                     every_n_epochs=1,
                                     )
-    
+    print('initializing trainer')
     trainer = pl.Trainer(callbacks=[dsc_model_checkpoint, loss_model_checkpoint],
                         benchmark=cfg.train.benchmark,
                         deterministic=cfg.train.deterministic,
@@ -64,16 +65,16 @@ def train(cfg_path: str):
                         auto_lr_find=cfg.train.auto_lr_find,
                         auto_scale_batch_size=cfg.train.auto_scale_batch_size,
                         fast_dev_run=cfg.train.fast_dev_run)
-
+    print('initializing tunning module')
     trainer.tune(module, datamodule=datamodule)
-
+    print('training')
     trainer.fit(module, datamodule=datamodule, ckpt_path=os.path.join(cfg.train.checkpoint_dir, f"{module.model.__class__.__name__}_{cfg.model.num_classes}_Classes_{cfg.train.precision}_f.ckpt") if os.path.exists(os.path.join(cfg.train.checkpoint_dir, f"{module.model.__class__.__name__}_{cfg.model.num_classes}_Classes_{cfg.train.precision}_f.ckpt")) else None)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Training Script")
     parser.add_argument("-cfg", "--config_file", type=str, metavar="", help="configuration file", default="config/default.yaml")
-
+    print(parser)
     args = parser.parse_args()
     train(args.config_file)
 

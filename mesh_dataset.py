@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 import pandas as pd
 import torch
-import vedo
+from vedo import vtk2numpy, load
 from utils import *
 
 def gen_metadata(mesh, patch_size):
@@ -11,9 +11,9 @@ def gen_metadata(mesh, patch_size):
         which includes attributes: mesh.celldata['labels']
     '''
     N = mesh.ncells
-    points = vedo.vtk2numpy(mesh.polydata().GetPoints().GetData())
+    points = vtk2numpy(mesh.polydata().GetPoints().GetData())
     # get cells' points indices
-    ids = vedo.vtk2numpy(mesh.polydata().GetPolys().GetData()).reshape((N, -1))[:,1:]
+    ids = vtk2numpy(mesh.polydata().GetPolys().GetData()).reshape((N, -1))[:,1:]
     # get the points in coordinates
     cells = points[ids].reshape(N, 9).astype(dtype='float32')
     labels = mesh.celldata["labels"].astype('int32').reshape(-1, 1)
