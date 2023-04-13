@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 import pandas as pd
 import torch
-from utils import *
+from utils import get_graph_feature
 import vtk
 import numpy as np
 
