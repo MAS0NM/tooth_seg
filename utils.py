@@ -1,11 +1,15 @@
-import pyvista as pv
+
 import numpy as np
 from collections import Counter
 import torch
 import glob
 import os
 import re
-
+try:
+    import pyvista as pv
+except:
+    print('cannot import pyvista')
+    
 def get_sample_name(filepath, with_ext=False):
     pattern = r"[\\/](\w+)\.(obj|vtk|json)$"
     match = re.search(pattern, filepath)
