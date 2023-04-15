@@ -2,8 +2,12 @@ from torch.utils.data import Dataset
 import pandas as pd
 import torch
 from utils import get_graph_feature
-import vtk
 import numpy as np
+try:
+    import vtk
+    import vedo
+except:
+    print('cannot import vtk or vedo')
 
 def vtk2np(pointdata):
     length = pointdata.GetNumberOfTuples()
@@ -33,23 +37,33 @@ def get_cell_centers(mesh):
     cell_centers_polydata =vtk2np(cell_centers_polydata.GetPoints().GetData())
     return cell_centers_polydata
     
-    
 
-def gen_metadata(mesh, patch_size):
+
+def gen_metadata(mesh, patch_size, mode='vedo'):
     '''
         to form a N x 15 vector
         input mesh form should be vedo.mesh.object
         which includes attributes: mesh.celldata['labels']
     '''
-    N = mesh.GetNumberOfCells()
-    points = vtk2np(mesh.GetPoints().GetData())
-    # get cells' points indices
-    ids = vtk2np(mesh.GetPolys().GetData()).astype(dtype='int32').reshape((N, -1))[:,1:]
-    # get the points in coordinates
-    cells = points[ids].reshape(N, 9).astype(dtype='float32')
-    labels = vtk2np(mesh.GetCellData().GetArray("labels")).astype('int32').reshape(-1, 1)
-    normals = compute_normals(mesh)
-    barycenters = get_cell_centers(mesh)
+    if mode == 'vtk':
+        N = mesh.GetNumberOfCells()
+        points = vtk2np(mesh.GetPoints().GetData())
+        # get cells' points indices
+        ids = vtk2np(mesh.GetPolys().GetData()).astype(dtype='int32').reshape((N, -1))[:,1:]
+        # get the points in coordinates
+        cells = points[ids].reshape(N, 9).astype(dtype='float32')
+        labels = vtk2np(mesh.GetCellData().GetArray("labels")).astype('int32').reshape(-1, 1)
+        normals = compute_normals(mesh)
+        barycenters = get_cell_centers(mesh)
+    elif mode == 'vedo':
+        N = mesh.ncells
+        points = vedo.vtk2numpy(mesh.polydata().GetPoints().GetData())
+        ids = vedo.vtk2numpy(mesh.polydata().GetPolys().GetData()).reshape((N, -1))[:,1:]
+        cells = points[ids].reshape(N, 9).astype(dtype='float32')
+        labels = mesh.celldata["labels"].astype('int32').reshape(-1, 1)
+        mesh.compute_normals()
+        normals = mesh.celldata['Normals']
+        barycenters = mesh.cell_centers()
     
     #normalized data
     maxs = points.max(axis=0)
@@ -122,7 +136,6 @@ class Mesh_Dataset(Dataset):
         reader.SetFileName(i_mesh)
         reader.Update()
         mesh = reader.GetOutput()
-            
         sample = gen_metadata(mesh, self.patch_size)
         return sample
 

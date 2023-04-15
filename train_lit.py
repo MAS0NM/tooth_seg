@@ -11,9 +11,11 @@ from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.strategies import *
 
-from dataset.LitDataModule import LitDataModule
+from LitDataModule import LitDataModule
 
 from model.LitModule import LitModule
+
+from mesh_dataset_h5 import H5_Mesh_Dataset
 
 
 def train(cfg_path: str):

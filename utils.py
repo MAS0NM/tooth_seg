@@ -1,16 +1,25 @@
-
 import numpy as np
-from collections import Counter
 import torch
 import glob
 import os
 import re
+
+
 try:
     import pyvista as pv
 except:
     print('cannot import pyvista')
     
+    
 def get_sample_name(filepath, with_ext=False):
+    '''
+        extract the sample name from the file path like
+        ./dataset/3D_scans_per_patient_obj_files_b1/YVGEP1R6/YVGEP1R6_lower.obj
+        to
+        YVGEP1R6_lower
+        or
+        YVGEP1R6_lower.obj
+    '''
     pattern = r"[\\/](\w+)\.(obj|vtk|json)$"
     match = re.search(pattern, filepath)
     if match:
@@ -18,6 +27,7 @@ def get_sample_name(filepath, with_ext=False):
     else:
         print(filepath, 'no match')
         return ''
+
 
 def read_filenames(dir_paths):
     '''
@@ -57,73 +67,28 @@ def filelist_checker(jaw_list, label_list):
                     
     return corr_jaw_list, corr_lab_list
 
+
 def visualize_mesh(mesh, mode='cells'):
-    # 17 colors, 0 for gum
-    colormap = [
-        [255, 255, 255],
-        [0, 128, 128],
-        [255, 105, 180],
-        [128, 0, 128],
-        [255, 165, 0],
-        [46, 139, 87],
-        [255, 0, 0],
-        [30, 144, 255],
-        [139, 0, 139],
-        [50, 205, 50],
-        [255, 69, 0],
-        [0, 191, 255],
-        [128, 0, 0],
-        [60, 179, 113],
-        [255, 20, 147],
-        [0, 128, 0],
-        [0, 255, 127]
-    ]
-    colormap = np.array(colormap, dtype=np.int8)
-    
-    # reconstruct pv object
+    '''
+        visualize the mesh with color, input mesh should be vedo.mesh
+    '''
     pv_mesh = pv.PolyData(mesh._data)
     plotter = pv.Plotter()
     
     if mode == 'points':
         labels_by_point = mesh.pointdata['labels']
-        pv_mesh.point_data['labels'] = labels_by_point
-        pv_mesh.point_data['colors'] = colormap[pv_mesh.point_data['labels']]
+        pv_mesh.point_data['colors'] = labels_by_point
         
     elif mode == 'cells':
         labels_by_cell = mesh.celldata['labels']
-        pv_mesh.cell_data['labels'] = labels_by_cell
-        pv_mesh.cell_data['colors'] = colormap[pv_mesh.cell_data['labels']]
+        pv_mesh.cell_data['colors'] = labels_by_cell
         
     pv_mesh.set_active_scalars("colors")  # set labels as the active scalars
     plotter = pv.Plotter()
-    plotter.add_mesh(pv_mesh, scalars="colors", show_scalar_bar=False)
+    plotter.add_mesh(pv_mesh, scalars=pv_mesh.cell_data['colors'], cmap='tab20', show_scalar_bar=True, )
     plotter.show()
     
     
-def set_face_label(mesh, labels_by_point, mode='count'):
-    labels_by_face = []
-    if mode == 'count':
-        for face in mesh.faces():
-            vertex_labels = [labels_by_point[i] if i < len(labels_by_point) else 0 for i in face]
-            if all(x == vertex_labels[0] for x in vertex_labels):
-                # print(face, vertex_labels)
-                labels_by_face.append(vertex_labels[0])
-            else:
-                label_count = Counter(vertex_labels)
-                most_common_label = label_count.most_common(1)[0][0]
-                labels_by_face.append(most_common_label)
-    elif mode == 'distance':
-        for face in mesh.faces():
-            vertex_labels = [labels_by_point[i] for i in face]
-            vertices = mesh.points()[face]
-            centroid = np.array([sum([x[i] for x in vertices])/3 for i in range(3)], dtype=np.uint8)
-            distances = np.array([sum(np.square(vertices-centroid))], dtype=np.float16)
-            nearest_point_index = np.argmin(distances)
-            this_label = vertex_labels[nearest_point_index]
-            labels_by_face.append(this_label)
-    return labels_by_face
-
-
 # def make_labeled_mesh_data(mesh_path, label_path):
 #     mesh = meshio.read(mesh_path)
 #     with open(label_path, 'r') as f:
@@ -148,7 +113,12 @@ def set_face_label(mesh, labels_by_point, mode='count'):
 #                 visualize_mesh(mesh)
 #     return meshes
 
+
 def read_dir(dir_path='./dataset/3D_scans_ds/', extension='vtk', constrain='FLP'):
+    '''
+        read all the files in the directory that has the required extension
+        return a list
+    '''
     files = []
     file_form = dir_path + r'*.' + extension
     paths = glob.glob(file_form)
@@ -157,6 +127,7 @@ def read_dir(dir_path='./dataset/3D_scans_ds/', extension='vtk', constrain='FLP'
         if constrain in file:
             files.append(file)
     return files
+            
             
 def centring(mesh):
     mesh.points(pts=mesh.points()-mesh.center_of_mass())
@@ -172,6 +143,9 @@ def knn(x, k):
             
 
 def get_graph_feature(x, k=20, idx=None, dim9=False, device='cpu'):
+    '''
+        perform graph cut on the mesh to refine
+    '''
     batch_size = x.size(0)
     num_points = x.size(2)
     x = x.view(batch_size, -1, num_points)

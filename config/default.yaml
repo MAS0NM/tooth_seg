@@ -5,8 +5,10 @@ model:
   num_channels: 15
   with_dropout: True
   dropout_p: 0.5
-  patch_size: 1000
+  patch_size: 7000
 train:
+  data_mode: 'h5'
+  hdf5_path: './dataset/3D_scans_h5/upper.hdf5'
   checkpoint_dir: './checkpoints'
   model_name: 'latest_checkpoint.pth'
   pretrain_file: 
@@ -18,8 +20,6 @@ train:
   epochs: 100
   precision: 32
   accumulate_grad_batches: 2
-  auto_lr_find: False
-  auto_scale_batch_size: False
   auto_lr_find: False
   auto_scale_batch_size: False
   fast_dev_run: False
@@ -34,7 +34,7 @@ logger:
   log_every_n_steps: 1
 dataloader:
   batch_size: 4
-  num_workers: 8
+  num_workers: 0
   trn_list: './dataset/FileLists/trn_list.csv'
   val_list: './dataset/FileLists/val_list.csv'
 infer:

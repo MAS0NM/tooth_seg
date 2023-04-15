@@ -12,3 +12,4 @@ __pycache__
 *.venus01
 pytorch.*
 *.swp
+*.hdf5
