@@ -1,5 +1,6 @@
 import os
 import sys
+from joblib import Parallel, delayed
 
 sys.path.append(os.getcwd())
 
@@ -16,7 +17,10 @@ from pygco import cut_from_graph
 
 from model.LitModule import LitModule
 from postprocessing import *
-from utils import visualize_mesh
+from utils import *
+import csv
+from os import cpu_count
+from tqdm import tqdm
 
 
 def infer(cfg_path: str, ckpt_path: str, mesh_file: str, refine: bool, device='cuda'):
@@ -45,7 +49,7 @@ def infer(cfg_path: str, ckpt_path: str, mesh_file: str, refine: bool, device='c
     infer_start_time = time.time()
     with torch.no_grad():
         tensor_prob_output = model(input_data["cells"], input_data["KG_12"],input_data["KG_6"])
-    print("Inference time: ", time.time()-infer_start_time)
+    # print("Inference time: ", time.time()-infer_start_time)
     patch_prob_output = tensor_prob_output.cpu().numpy()
 
     for i_label in range(cfg.model.num_classes):
@@ -56,11 +60,11 @@ def infer(cfg_path: str, ckpt_path: str, mesh_file: str, refine: bool, device='c
     mesh2.celldata['labels'] = predicted_labels_d
     
     if not refine:
-        print("Total time: ", time.time()-start_time)
+        # print("Total time: ", time.time()-start_time)
         return mesh2
     else:
         # refinement
-        print('\tRefining by pygco...')
+        # print('\tRefining by pygco...')
         round_factor = 100
         patch_prob_output[patch_prob_output<1.0e-6] = 1.0e-6
 
@@ -104,21 +108,64 @@ def infer(cfg_path: str, ckpt_path: str, mesh_file: str, refine: bool, device='c
         mesh3 = mesh_d.clone()
         mesh3.celldata['labels'] = refine_labels
 
-        print("Total time: ", time.time()-start_time)
+        # print("Total time: ", time.time()-start_time)
         return mesh3
+
+def cal_precision(path, args):
+    mesh_trth = vedo.load(path)
+    mesh_pred = infer(args.config_file, args.ckpt_path, path, args.pygco)
+    orig_labels = mesh_trth.celldata['labels']
+    pred_labels = mesh_pred.celldata['labels']
+    acc = float(np.mean(orig_labels == pred_labels))
+    # print(f"acc: {acc*100}%")
+    with open('./pred&truth.csv', 'a') as f:
+        f.write('\t'.join([get_sample_name(path), ','.join(map(str, orig_labels)), ','.join(map(str, pred_labels))]) + '\n')
+    with open('./precision.csv', 'a') as f:
+        f.write('\t'.join([get_sample_name(path), str(acc)]) + '\n')
+    return acc
+
+def cal_precision_all(args, filelist):
+    # clear the file contents
+    with open('./pred&truth.csv', 'w') as f:
+        pass
+    with open('./precision.csv', 'w') as f:
+        pass
+    Parallel(n_jobs=4)(delayed(cal_precision)(path, args) for path in tqdm(filelist, desc='calculating precision'))
+    # cal_precision(filelist, args)
+    total_acc, AUG_acc = 0, 0
+    total_count, AUG_count = 0, 0
+    with open('precision.csv', 'r') as f:
+        reader = csv.reader(f, delimiter='\t')
+        lines = list(reader)
+    for item, i in lines:
+        if 'AUG' in item:
+            AUG_count += 1
+            AUG_acc += float(i)
+        total_acc += float(i)
+        total_count += 1
+    return f'total accuracy is {total_acc / total_count * 100}% \n \
+        augmented item accuracy is {AUG_acc / AUG_count * 100}% \n \
+            origin item accuracy is {(total_acc-AUG_acc)/(total_count-AUG_count)*100}%'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Training Script")
     parser.add_argument("-cfg", "--config_file", type=str, metavar="", help="configuration file", default="config/default.yaml")
     parser.add_argument("-gco", "--pygco", type=ast.literal_eval, metavar="", help="pygco", default=True)
-    parser.add_argument("-ckpt", "--ckpt_path", type=str, metavar="", help="ckpt file", default='./checkpoints/iMeshSegNet_17_Classes_32_f_best_loss.ckpt')
-    parser.add_argument("-mesh", "--mesh_file", type=str, metavar="", help="mesh file", default='./dataset/3D_scans_per_patient_obj_files_b1/01A6GW4A/01A6GW4A_lower.vtk')
+    parser.add_argument("-ckpt", "--ckpt_path", type=str, metavar="", help="ckpt file", default='./checkpoints/iMeshSegNet_17_Classes_32_f_best_loss-v1.ckpt')
+    parser.add_argument("-mesh", "--mesh_file", type=str, metavar="", help="mesh file", default='./dataset/3D_scans_ds/Z8HJR6YS_upper_FLP_AUG03_.vtk')
 
     args = parser.parse_args()
 
-    output = infer(args.config_file, args.ckpt_path, args.mesh_file, args.pygco)
+    # output = infer(args.config_file, args.ckpt_path, args.mesh_file, args.pygco)
+    # mesh_ds = vedo.load(args.mesh_file)
+    # paral_visualize_mesh(mesh_ds, output)
     
-    visualize_mesh(output)
-    
-    outuput_name = args.mesh_file.split('/')[-1]
-    vedo.write(output, f'./inf_output/predicted_{outuput_name}')
+    # cal_precision(mesh_ds, output)
+    val_list = []
+    with open('./dataset/FileLists/val_list.csv', 'r') as f:
+        reader = csv.reader(f)
+        val_list = list(reader)
+    val_list = [item[0] for item in val_list]
+    print(cal_precision_all(args, val_list))
+    # outuput_name = args.mesh_file.split('/')[-1]
+    # vedo.write(output, f'./inf_output/predicted_{outuput_name}')

@@ -13,3 +13,5 @@ __pycache__
 pytorch.*
 *.swp
 *.hdf5
+/*.txt
+/*.csv

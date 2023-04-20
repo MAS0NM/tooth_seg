@@ -8,6 +8,7 @@ from losses_and_metrics.losses_and_metrics import *
 from losses_and_metrics.lovasz_losses import *
 from losses_and_metrics import Lovasz_Softmax_Flat
 from .imeshsegnet import iMeshSegNet
+from collections import OrderedDict
 
 class LitModule(pl.LightningModule):
     def __init__(self,cfg: OmegaConf):
@@ -46,7 +47,13 @@ class LitModule(pl.LightningModule):
         
     def load_model(self, path):
         ckpt = torch.load(path, map_location=self.device)
-        self.model.load_state_dict(ckpt["model_state_dict"], strict=True)
+        new_state_dict = OrderedDict()
+        for k, v in ckpt['state_dict'].items():
+            name = k[6:] # remove the 'model.' in ckpt['state_dict']['model.*']
+            new_state_dict[name] = v
+        epoch, global_step = ckpt['epoch'], ckpt['global_step']
+        print(f'loading checkpoint with epoch:{epoch} and global step: {global_step}')
+        self.model.load_state_dict(new_state_dict, strict=True)
         
     def training_step(self, batch, batch_idx):
         return self._step(batch, "train")

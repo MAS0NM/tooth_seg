@@ -28,6 +28,8 @@ train:
   weight_decay: 1e-5
   step_size: 1000
   gamma: 0.1
+  val_check_interval: 10
+  multiGPU: 2
 logger:
   use: True
   project: 'tooth seg'

@@ -36,8 +36,6 @@ def gen_metadata_inf(cfg: OmegaConf, mesh: vedo.Mesh, device='cuda'):
 
     meta = dict()
     meta["cells"] = torch.from_numpy(X).unsqueeze(0).to(device, dtype=torch.float)
-
-    print("Getting KG6 and KG12.")
     KG_6 = get_graph_feature(torch.from_numpy(X[9:12, :]).unsqueeze(0), k=6).squeeze(0)
     KG_12 = get_graph_feature(torch.from_numpy(X[9:12, :]).unsqueeze(0), k=12).squeeze(0)
     meta["KG_6"] = KG_6.unsqueeze(0).to(device, dtype=torch.float)
