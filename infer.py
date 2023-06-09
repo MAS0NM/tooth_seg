@@ -1,7 +1,7 @@
 import os
 import sys
 from joblib import Parallel, delayed
-
+import random
 sys.path.append(os.getcwd())
 
 import argparse
@@ -22,19 +22,25 @@ import csv
 from os import cpu_count
 from tqdm import tqdm
 
+from torchviz import make_dot
 
-def infer(cfg_path: str, ckpt_path: str, mesh_file: str, refine: bool, device='cuda'):
-    cfg = OmegaConf.load(cfg_path)
+def infer(cfg, model, mesh_file, cfg_path=None, ckpt_path=None, refine=True, device='cuda', print_time=False, with_raw_output=False):
+    if not cfg and cfg_path:
+        cfg = OmegaConf.load(cfg_path)
     if len(cfg.infer.devices) == 1 and cfg.infer.accelerator == "gpu":
         device = f"cuda:{cfg.infer.devices[0]}"
     elif len(cfg.infer.devices) > 1 and cfg.infer.accelerator == "gpu":
         device = "cuda:0"
-    module = LitModule(cfg).load_from_checkpoint(ckpt_path)
-    model = module.model.to(device)
-    model.eval()
+    if not model and ckpt_path:
+        module = LitModule(cfg).load_from_checkpoint(ckpt_path)
+        model = module.model.to(device)
+        model.eval()
     
-    mesh = vedo.load(mesh_file)
     start_time = time.time()
+    if type(mesh_file) == str:
+        mesh = vedo.load(mesh_file)
+    else:
+        mesh = mesh_file
     N = mesh.ncells
     points = vedo.vtk2numpy(mesh.polydata().GetPoints().GetData())
     ids = vedo.vtk2numpy(mesh.polydata().GetPolys().GetData()).reshape((N, -1))[:,1:]
@@ -45,11 +51,12 @@ def infer(cfg_path: str, ckpt_path: str, mesh_file: str, refine: bool, device='c
     mesh_d = mesh.clone()
     predicted_labels_d = np.zeros([mesh_d.ncells, 1], dtype=np.int32)
     input_data = gen_metadata_inf(cfg, mesh, device)
+    load_time = time.time() - start_time
 
     infer_start_time = time.time()
     with torch.no_grad():
         tensor_prob_output = model(input_data["cells"], input_data["KG_12"],input_data["KG_6"])
-    # print("Inference time: ", time.time()-infer_start_time)
+    inf_time = time.time() - infer_start_time
     patch_prob_output = tensor_prob_output.cpu().numpy()
 
     for i_label in range(cfg.model.num_classes):
@@ -60,9 +67,13 @@ def infer(cfg_path: str, ckpt_path: str, mesh_file: str, refine: bool, device='c
     mesh2.celldata['labels'] = predicted_labels_d
     
     if not refine:
-        # print("Total time: ", time.time()-start_time)
+        if print_time:
+            print(f"mesh loading time:{load_time}\ninference time:{inf_time}\ntotal time:{total_time}")
+        if with_raw_output:
+            return mesh2, tensor_prob_output
         return mesh2
     else:
+        post_start_time = time.time()
         # refinement
         # print('\tRefining by pygco...')
         round_factor = 100
@@ -107,13 +118,17 @@ def infer(cfg_path: str, ckpt_path: str, mesh_file: str, refine: bool, device='c
         # output refined result
         mesh3 = mesh_d.clone()
         mesh3.celldata['labels'] = refine_labels
-
-        # print("Total time: ", time.time()-start_time)
+        post_time = time.time()-post_start_time
+        total_time = time.time()-start_time
+        if print_time:
+            print(f"mesh loading time:{load_time}\ninference time:{inf_time}\npost processing time:{post_time}\ntotal time:{total_time}")
+        if with_raw_output:
+            return mesh3, tensor_prob_output
         return mesh3
 
-def cal_precision(path, args):
+def cal_precision(cfg, model, path, args):
     mesh_trth = vedo.load(path)
-    mesh_pred = infer(args.config_file, args.ckpt_path, path, args.pygco)
+    mesh_pred = infer(cfg, model, path, args.config_file, args.ckpt_path, args.pygco)
     orig_labels = mesh_trth.celldata['labels']
     pred_labels = mesh_pred.celldata['labels']
     acc = float(np.mean(orig_labels == pred_labels))
@@ -124,48 +139,113 @@ def cal_precision(path, args):
         f.write('\t'.join([get_sample_name(path), str(acc)]) + '\n')
     return acc
 
-def cal_precision_all(args, filelist):
+def cal_precision_all(cfg, model, args, filelist):
     # clear the file contents
     with open('./pred&truth.csv', 'w') as f:
         pass
     with open('./precision.csv', 'w') as f:
         pass
-    Parallel(n_jobs=4)(delayed(cal_precision)(path, args) for path in tqdm(filelist, desc='calculating precision'))
+    Parallel(n_jobs=4)(delayed(cal_precision)(cfg, model, path, args) for path in tqdm(filelist, desc='calculating precision'))
     # cal_precision(filelist, args)
-    total_acc, AUG_acc = 0, 0
-    total_count, AUG_count = 0, 0
+    total_acc, R_acc, T_acc, S_acc = 0, 0, 0, 0
+    total_count, R_count, T_count, S_count = 0, 0, 0, 0
     with open('precision.csv', 'r') as f:
         reader = csv.reader(f, delimiter='\t')
         lines = list(reader)
     for item, i in lines:
-        if 'AUG' in item:
-            AUG_count += 1
-            AUG_acc += float(i)
+        if '_R_' in item:
+            R_count += 1
+            R_acc += float(i)
+        if '_T_' in item:
+            T_count += 1
+            T_acc += float(i)
+        if '_S_' in item:
+            S_count += 1
+            S_acc += float(i)
         total_acc += float(i)
         total_count += 1
-    return f'total accuracy is {total_acc / total_count * 100}% \n \
-        augmented item accuracy is {AUG_acc / AUG_count * 100}% \n \
-            origin item accuracy is {(total_acc-AUG_acc)/(total_count-AUG_count)*100}%'
+    return f'total accuracy is {total_acc / total_count * 100}% \n '
+# rotated item accuracy is {R_acc / R_count * 100}% \n \
+# translated item accuracy is {T_acc / T_count * 100}% \n \
+# rescaled item accuracy is {S_acc / S_count * 100}% \n \
+# origin item accuracy is {(total_acc-R_acc-T_acc-S_acc)/(total_count-R_count-T_count-S_count)*100}%'
+            
+            
+def visualize_network(cfg_path: str, device='cuda'):
+    cfg = OmegaConf.load(cfg_path)
+    if len(cfg.infer.devices) == 1 and cfg.infer.accelerator == "gpu":
+        device = f"cuda:{cfg.infer.devices[0]}"
+    elif len(cfg.infer.devices) > 1 and cfg.infer.accelerator == "gpu":
+        device = "cuda:0"
+    module = LitModule(cfg)
+    model = module.model.to(device)
+    model.eval()
+    cells, kg6, kg12 = torch.randn(1,15,10000).cuda(), torch.randn(1,6,10000, 12).cuda(), torch.randn(1,6,10000,6).cuda(), 
+    y = model(cells, kg6, kg12)
+    g = make_dot(y, params=dict(model.named_parameters()))
+    g.render('dcg', view=True)
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Training Script")
     parser.add_argument("-cfg", "--config_file", type=str, metavar="", help="configuration file", default="config/default.yaml")
     parser.add_argument("-gco", "--pygco", type=ast.literal_eval, metavar="", help="pygco", default=True)
-    parser.add_argument("-ckpt", "--ckpt_path", type=str, metavar="", help="ckpt file", default='./checkpoints/iMeshSegNet_17_Classes_32_f_best_loss-v1.ckpt')
+    parser.add_argument("-ckpt", "--ckpt_path", type=str, metavar="", help="ckpt file", default='./checkpoints/iMeshSegNet_17_Classes_32_f_rotate_enhance-v1.ckpt')
     parser.add_argument("-mesh", "--mesh_file", type=str, metavar="", help="mesh file", default='./dataset/3D_scans_ds/Z8HJR6YS_upper_FLP_AUG03_.vtk')
 
     args = parser.parse_args()
-
-    # output = infer(args.config_file, args.ckpt_path, args.mesh_file, args.pygco)
-    # mesh_ds = vedo.load(args.mesh_file)
-    # paral_visualize_mesh(mesh_ds, output)
     
-    # cal_precision(mesh_ds, output)
+    '''
+    load configure file and the model
+    '''
+    cfg = OmegaConf.load(args.config_file)
+    if len(cfg.infer.devices) == 1 and cfg.infer.accelerator == "gpu":
+        device = f"cuda:{cfg.infer.devices[0]}"
+    elif len(cfg.infer.devices) > 1 and cfg.infer.accelerator == "gpu":
+        device = "cuda:0"
+    module = LitModule(cfg).load_from_checkpoint(args.ckpt_path)
+    model = module.model.to(device)
+    model.eval()
+    
+    
+    '''
+    calculate precision
+    '''
     val_list = []
-    with open('./dataset/FileLists/val_list.csv', 'r') as f:
+    with open('./dataset/FileLists/filelist_final.csv', 'r') as f:
         reader = csv.reader(f)
         val_list = list(reader)
     val_list = [item[0] for item in val_list]
-    print(cal_precision_all(args, val_list))
-    # outuput_name = args.mesh_file.split('/')[-1]
+    random.shuffle(val_list)
+    print(cal_precision_all(cfg, model, args, val_list[:100]))
+    
+    
+    '''
+    visualize network
+    '''
+    # visualize_network(args.config_file)
+    # outuput_name = args.mesh_file.split('/')[-1]W
     # vedo.write(output, f'./inf_output/predicted_{outuput_name}')
+    
+    
+    '''
+    do inference on single mesh
+    '''
+    # mesh_with_refine = infer(cfg=cfg, model=model, mesh_file='./dataset/3D_scans_ds/01328DDN_upper.vtk', refine=True)
+    # mesh_wiou_refine = infer(cfg=cfg, model=model, mesh_file='./dataset/3D_scans_ds/Z8HJR6YS_upper_FLP.vtk', refine=False)
+    # visualize_mesh(mesh_with_refine)
+    # visualize_mesh(mesh_wiou_refine)
+    
+    
+    '''
+    generate mesh predictions
+    '''
+    # pred_dir = './dataset/3D_pred/'
+    # mesh_ls = read_dir('./dataset/3D_scans_ds/', extension='vtk', constrain='')
+    # mesh_ls = [i for i in mesh_ls if 'AUG' not in i]
+    # for mesh_path in tqdm([mesh_ls[0]]):
+    #     mesh_with_refine = infer(cfg=cfg, model=model, mesh_file=mesh_path, refine=True)
+    #     mesh_name = get_sample_name(mesh_path)
+    #     des_file = os.path.join(pred_dir, mesh_name + '.vtk')
+    #     mesh_with_refine.write(des_file)
+    #     visualize_mesh(mesh_with_refine)

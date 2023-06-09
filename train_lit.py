@@ -25,7 +25,7 @@ def train(cfg_path: str):
     datamodule.setup()
     module = LitModule(cfg)
     print('trying to load last checkpoint')    
-    latest_model_to_load = f"{cfg.train.checkpoint_dir}/{module.model.__class__.__name__}_{cfg.model.num_classes}_Classes_{cfg.train.precision}_f_best_DSC-v1.ckpt"
+    latest_model_to_load = f"{cfg.train.checkpoint_dir}/{module.model.__class__.__name__}_{cfg.model.num_classes}_Classes_{cfg.train.precision}_f_best_DSC-v2.ckpt"
 
     if latest_model_to_load is not None and os.path.exists(latest_model_to_load):
         print(latest_model_to_load)

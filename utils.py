@@ -68,50 +68,34 @@ def filelist_checker(jaw_list, label_list):
     return corr_jaw_list, corr_lab_list
 
 
-def visualize_mesh(mesh, mode='cells'):
+def visualize_mesh(mesh, mode='cells', with_color=True):
     '''
         visualize the mesh with color, input mesh should be vedo.mesh
     '''
+    if isinstance(mesh, str):
+        import vedo
+        mesh = vedo.Mesh(mesh)
+        
     pv_mesh = pv.PolyData(mesh._data)
     plotter = pv.Plotter()
     
-    if mode == 'points':
-        labels_by_point = mesh.pointdata['labels']
-        pv_mesh.point_data['colors'] = labels_by_point
-        
-    elif mode == 'cells':
-        labels_by_cell = mesh.celldata['labels']
-        pv_mesh.cell_data['colors'] = labels_by_cell
-        
-    pv_mesh.set_active_scalars("colors")  # set labels as the active scalars
-    plotter = pv.Plotter()
-    plotter.add_mesh(pv_mesh, scalars=pv_mesh.cell_data['colors'], cmap='tab20', show_scalar_bar=True, )
+    if not with_color:
+        plotter.add_mesh(pv_mesh, color='white')
+    
+    if with_color:
+        if mode == 'points':
+            labels_by_point = mesh.pointdata['labels']
+            pv_mesh.point_data['colors'] = labels_by_point
+            
+        elif mode == 'cells':
+            labels_by_cell = mesh.celldata['labels']
+            pv_mesh.cell_data['colors'] = labels_by_cell
+            
+        pv_mesh.set_active_scalars("colors")  # set labels as the active scalars
+        plotter.add_mesh(pv_mesh, scalars=pv_mesh.cell_data['colors'], cmap='tab20', show_scalar_bar=False, )
+    
+    plotter.add_axes()
     plotter.show()
-    
-    
-# def make_labeled_mesh_data(mesh_path, label_path):
-#     mesh = meshio.read(mesh_path)
-#     with open(label_path, 'r') as f:
-#         attr = json.load(f)
-#     labels_by_point = attr['labelByPoints']
-#     labels_by_face = attr['labelByFaces']
-#     mesh.pointdata['labels'] = labels_by_point
-#     mesh.celldata['labels'] = labels_by_face
-#     return mesh
-
-
-# def dataReader(dir_path='./dataset/FileLists/fileList_lower_ds.txt', visualize=False):
-#     meshes = []
-#     with open(dir_path, 'r') as f:
-#         for line in f.readlines():
-#             line = line.strip().split('\t')
-#             mesh_path = line[0]
-#             label_path = line[1]
-#             mesh = make_labeled_mesh_data(mesh_path, label_path)
-#             meshes.append(mesh)
-#             if visualize:
-#                 visualize_mesh(mesh)
-#     return meshes
 
 
 def read_dir(dir_path='./dataset/3D_scans_ds/', extension='vtk', constrain='FLP'):
@@ -124,7 +108,7 @@ def read_dir(dir_path='./dataset/3D_scans_ds/', extension='vtk', constrain='FLP'
     paths = glob.glob(file_form)
     for file in paths:
         file = file.replace('\\','/')
-        if constrain in file:
+        if constrain in file or not constrain == '':
             files.append(file)
     return files
             
@@ -164,3 +148,11 @@ def get_graph_feature(x, k=20, idx=None, dim9=False, device='cpu'):
     x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
     feature = torch.cat((feature-x, x), dim=3).permute(0, 3, 1, 2).contiguous()
     return feature      # (batch_size, 2*num_dims, num_points, k)
+
+
+def read_filelist(file_path):
+    filelist = []
+    with open(file_path, 'r') as f:
+        filelist = f.readlines()
+        filelist = [i.strip() for i in filelist]
+    return filelist

@@ -1,7 +1,6 @@
 checkpoints/
 dataset/3D_scans_ds/
-dataset/3D_scans_per_patient_obj_files_b1/
-dataset/3D_scans_per_patient_obj_files_b2/
+dataset/
 inf_output/
 lightning_logs
 runs
@@ -15,3 +14,4 @@ pytorch.*
 *.hdf5
 /*.txt
 /*.csv
+*.vtk

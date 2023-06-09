@@ -17,6 +17,7 @@ def vtk2np(pointdata):
         numpy_array[i] = pointdata.GetTuple(i)
     return numpy_array
 
+
 def compute_normals(mesh):
     
     normals = vtk.vtkPolyDataNormals()
@@ -28,6 +29,7 @@ def compute_normals(mesh):
 
     return cell_normals
 
+
 def get_cell_centers(mesh):
     cell_centers = vtk.vtkCellCenters()
     cell_centers.SetInputData(mesh)
@@ -36,10 +38,10 @@ def get_cell_centers(mesh):
     cell_centers_polydata = cell_centers.GetOutput()
     cell_centers_polydata =vtk2np(cell_centers_polydata.GetPoints().GetData())
     return cell_centers_polydata
-    
 
 
-def gen_metadata(mesh, patch_size, mode='vedo'):
+
+def gen_metadata(mesh, patch_size, mode='vedo', is_new=False):
     '''
         to form a N x 15 vector
         input mesh form should be vedo.mesh.object
@@ -54,7 +56,7 @@ def gen_metadata(mesh, patch_size, mode='vedo'):
         cells = points[ids].reshape(N, 9).astype(dtype='float32')
         labels = vtk2np(mesh.GetCellData().GetArray("labels")).astype('int32').reshape(-1, 1)
         normals = compute_normals(mesh)
-        barycenters = get_cell_centers(mesh)
+        # barycenters = get_cell_centers(mesh)
     elif mode == 'vedo':
         N = mesh.ncells
         points = vedo.vtk2numpy(mesh.polydata().GetPoints().GetData())
@@ -65,24 +67,37 @@ def gen_metadata(mesh, patch_size, mode='vedo'):
         normals = mesh.celldata['Normals']
         barycenters = mesh.cell_centers()
     
-    #normalized data
-    maxs = points.max(axis=0)
-    mins = points.min(axis=0)
-    means = points.mean(axis=0)
-    stds = points.std(axis=0)
-    nmeans = normals.mean(axis=0)
-    nstds = normals.std(axis=0)
 
-    for i in range(3):
-        cells[:, i] = (cells[:, i] - means[i]) / stds[i] #point 1
-        cells[:, i+3] = (cells[:, i+3] - means[i]) / stds[i] #point 2
-        cells[:, i+6] = (cells[:, i+6] - means[i]) / stds[i] #point 3
-        barycenters[:,i] = (barycenters[:,i] - mins[i]) / (maxs[i]-mins[i])
-        normals[:,i] = (normals[:,i] - nmeans[i]) / nstds[i]
+    # form the vectors
+    if not is_new:
+        #normalized data
+        maxs = points.max(axis=0)
+        mins = points.min(axis=0)
+        means = points.mean(axis=0)
+        stds = points.std(axis=0)
+        nmeans = normals.mean(axis=0)
+        nstds = normals.std(axis=0)
+        
+        for i in range(3):
+            cells[:, i] = (cells[:, i] - means[i]) / stds[i] #point 1
+            cells[:, i+3] = (cells[:, i+3] - means[i]) / stds[i] #point 2
+            cells[:, i+6] = (cells[:, i+6] - means[i]) / stds[i] #point 3
+            barycenters[:,i] = (barycenters[:,i] - mins[i]) / (maxs[i]-mins[i])
+            normals[:,i] = (normals[:,i] - nmeans[i]) / nstds[i]
 
-    X = np.column_stack((cells, barycenters, normals))
-    Y = labels
+        X = np.column_stack((cells, barycenters, normals))
+        Y = labels
     
+    elif is_new:
+        faces = cells
+        face_centers = np.mean(faces.reshape(-1, 3, 3), axis=1)
+        face_normals = normals
+        corner_vectors = np.hstack((faces[:,0:3] - face_centers,
+                                    faces[:,3:6] - face_centers,
+                                    faces[:,6:9] - face_centers))
+        X = np.column_stack((corner_vectors, face_centers, face_normals))
+        Y = labels
+        
     # initialize batch of input and label
     X_train = np.zeros([patch_size, X.shape[1]], dtype='float32')
     Y_train = np.zeros([patch_size, Y.shape[1]], dtype='int32')
@@ -118,6 +133,8 @@ def gen_metadata(mesh, patch_size, mode='vedo'):
     
     return metadata
 
+
+# this is not used if train with h5 file
 class Mesh_Dataset(Dataset):
     def __init__(self, data_list_path, num_classes=15, patch_size=6000):
         self.data_list = pd.read_csv(data_list_path, header=None)

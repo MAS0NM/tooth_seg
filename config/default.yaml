@@ -7,6 +7,7 @@ model:
   dropout_p: 0.5
   patch_size: 7000
 train:
+  h5_dir: './dataset/3D_scans_h5/'
   data_mode: 'h5'
   hdf5_path: './dataset/3D_scans_h5/upper.hdf5'
   checkpoint_dir: './checkpoints'
@@ -24,8 +25,8 @@ train:
   auto_scale_batch_size: False
   fast_dev_run: False
   optimizer: 'adam'
-  learning_rate: 1e-4
-  weight_decay: 1e-5
+  learning_rate: 0.0069
+  weight_decay: 0
   step_size: 1000
   gamma: 0.1
   val_check_interval: 10
