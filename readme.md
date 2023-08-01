@@ -11,3 +11,6 @@
 
 ## inference and visualization
 `python test_inf.py`
+
+## Contribution
+Apart from those codes under `./losses_and_metrics` and `./model`, and `mesh_dataset.py`, `train.py`.
