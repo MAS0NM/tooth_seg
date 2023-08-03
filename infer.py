@@ -190,7 +190,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Training Script")
     parser.add_argument("-cfg", "--config_file", type=str, metavar="", help="configuration file", default="config/default.yaml")
     parser.add_argument("-gco", "--pygco", type=ast.literal_eval, metavar="", help="pygco", default=True)
-    parser.add_argument("-ckpt", "--ckpt_path", type=str, metavar="", help="ckpt file", default='./checkpoints/iMeshSegNet_17_Classes_32_f_rotate_enhance-v1.ckpt')
+    parser.add_argument("-ckpt", "--ckpt_path", type=str, metavar="", help="ckpt file", default='./checkpoints/iMeshSegNet_mix_new_17_Classes_32_f_best_DSC.ckpt')
     parser.add_argument("-mesh", "--mesh_file", type=str, metavar="", help="mesh file", default='./dataset/3D_scans_ds/Z8HJR6YS_upper_FLP_AUG03_.vtk')
 
     args = parser.parse_args()
@@ -212,12 +212,13 @@ if __name__ == '__main__':
     calculate precision
     '''
     val_list = []
-    with open('./dataset/FileLists/filelist_final.csv', 'r') as f:
+    with open('./dataset/FileLists/filelist_test_ds.txt', 'r') as f:
         reader = csv.reader(f)
         val_list = list(reader)
     val_list = [item[0] for item in val_list]
-    random.shuffle(val_list)
-    print(cal_precision_all(cfg, model, args, val_list[:100]))
+    print(len(val_list))
+    # random.shuffle(val_list)
+    print(cal_precision_all(cfg, model, args, val_list))
     
     
     '''

@@ -404,31 +404,19 @@ if __name__ == '__main__':
     cfg = OmegaConf.load("config/default.yaml")
     target_cells = 10001
     dataset_num = 200
-    # existing_mesh_files = read_dir(dir_path='./dataset/3D_scans_ds/', extension='vtk', constrain='')
-    # do_downsample(upper_jaws[:dataset_num], upper_labels[:dataset_num], target_cells=target_cells, filelist='./dataset/FileLists/fileList_upper_ds.txt', ds_dir = './dataset/3D_scans_ds/')
-    # print(f"upper batch is done")
-    # do_downsample(lower_jaws[:dataset_num], lower_labels[:dataset_num], target_cells=target_cells, filelist='./dataset/FileLists/fileList_upper_ds.txt', ds_dir = './dataset/3D_scans_ds/')
-    # print(f"lower batch is done")
-    # do_augmentation(ip_dir='./dataset/3D_scans_ds/', op_dir='./dataset/3D_scans_ds/', aug_num=4, existing_mesh_files=existing_mesh_files)
-    # trn_list, val_list, file_list = make_filelist_final()
+    existing_mesh_files = read_dir(dir_path='./dataset/3D_scans_ds/', extension='vtk', constrain='')
+    do_downsample(upper_jaws[:dataset_num], upper_labels[:dataset_num], target_cells=target_cells, filelist='./dataset/FileLists/fileList_upper_ds.txt', ds_dir = './dataset/3D_scans_ds/')
+    print(f"upper batch is done")
+    do_downsample(lower_jaws[:dataset_num], lower_labels[:dataset_num], target_cells=target_cells, filelist='./dataset/FileLists/fileList_upper_ds.txt', ds_dir = './dataset/3D_scans_ds/')
+    print(f"lower batch is done")
+    do_augmentation(ip_dir='./dataset/3D_scans_ds/', op_dir='./dataset/3D_scans_ds/', aug_num=4, existing_mesh_files=existing_mesh_files)
+    trn_list, val_list, file_list = make_filelist_final()
     trn_list = read_filelist('./dataset/FileLists/trn_list.csv')
     val_list = read_filelist('./dataset/FileLists/val_list.csv')
     print(f'training set size: {len(trn_list)}\nvalidation set size: {len(val_list)}')
-    # vtk2stl(existing_mesh_files, des_dir='./dataset/3D_scans_stl')
-    # vtk2h5(cfg, 'mix_ori', parallel=False)
+    vtk2stl(existing_mesh_files, des_dir='./dataset/3D_scans_stl')
+    vtk2h5(cfg, 'mix_ori', parallel=False)
     
         
     # below is the command line to compress the h5 file
     # h5repack -v -f GZIP=9 ./dataset/3D_scans_h5/upper.hdf5 ./dataset/3D_scans_h5/compressed_upper.hdf5
-    
-    
-    test_set = upper_jaws+lower_jaws
-    test_set_labels = upper_labels+lower_labels
-    with open('./dataset/FileLists/tst_list.csv', 'w', newline='') as f:
-        trn_list_lookup = [get_sample_name(i) for i in trn_list]
-        val_list_lookup = [get_sample_name(i) for i in val_list]
-        lookup_list = trn_list_lookup + val_list_lookup
-        writer = csv.writer(f)
-        for idx, line in enumerate(test_set):
-            if get_sample_name(line) not in lookup_list:
-                writer.writerow([line, test_set_labels[idx]])
