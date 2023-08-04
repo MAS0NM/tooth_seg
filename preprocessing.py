@@ -411,10 +411,10 @@ if __name__ == '__main__':
     print(f"lower batch is done")
     do_augmentation(ip_dir='./dataset/3D_scans_ds/', op_dir='./dataset/3D_scans_ds/', aug_num=4, existing_mesh_files=existing_mesh_files)
     trn_list, val_list, file_list = make_filelist_final()
-    trn_list = read_filelist('./dataset/FileLists/trn_list.csv')
-    val_list = read_filelist('./dataset/FileLists/val_list.csv')
+    # trn_list = read_filelist('./dataset/FileLists/trn_list.csv')
+    # val_list = read_filelist('./dataset/FileLists/val_list.csv')
     print(f'training set size: {len(trn_list)}\nvalidation set size: {len(val_list)}')
-    vtk2stl(existing_mesh_files, des_dir='./dataset/3D_scans_stl')
+    # vtk2stl(existing_mesh_files, des_dir='./dataset/3D_scans_stl')
     vtk2h5(cfg, 'mix_ori', parallel=False)
     
         
